@@ -1,4 +1,4 @@
-"""Fail the image build if the bundled multilingual model cannot infer offline."""
+"""Verify offline inference using the mounted multilingual model."""
 
 import os
 from pathlib import Path
@@ -24,4 +24,4 @@ actual_device = str(next(agent.model.parameters()).device)
 assert actual_device.split(":")[0] == predictor.device.split(":")[0], actual_device
 if ":" in predictor.device:
     assert actual_device == predictor.device, actual_device
-print(f"Bundled multilingual model passed offline inference on {predictor.device} with default and extended budgets")
+print(f"Multilingual model passed offline inference on {predictor.device} with default and extended budgets")

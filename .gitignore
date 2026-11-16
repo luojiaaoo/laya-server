@@ -42,7 +42,6 @@ profile.cov
 *.sqlite3-shm
 *.sqlite3-wal
 # Downloaded models and ModelScope download metadata
-/model/
 /models/
 # Local application data (SQLite database and runtime cache)
 /data/

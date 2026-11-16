@@ -1,6 +1,21 @@
 services:
+  model-init:
+    build:
+      context: .
+      target: model-downloader
+    environment:
+      - LAYA_MODEL_DIR=/models
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./models:/models
+    restart: "no"
+    init: true
+
   app:
     image: 1panel/laya-server:${LAYA_IMAGE_TAG:-latest}
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
     environment:
       - LAYA_ADMIN_USERNAME
       - LAYA_ADMIN_PASSWORD

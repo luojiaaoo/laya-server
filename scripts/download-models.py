@@ -18,10 +18,17 @@ FILES = (
 )
 
 
-def download_model(root: Path) -> None:
+def download_model(root: Path, *, if_missing: bool = False) -> None:
+    destination = root / "multilingual"
+    if if_missing and all(
+        (destination / filename).is_file() and (destination / filename).stat().st_size > 0
+        for filename in FILES
+    ):
+        print(f"Multilingual model already exists in {destination}; skipping download", flush=True)
+        return
+
     from modelscope import snapshot_download
 
-    destination = root / "multilingual"
     destination.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {REPO} from ModelScope", flush=True)
     for attempt in range(5):
@@ -43,10 +50,11 @@ def download_model(root: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument("--if-missing", action="store_true", help="Skip downloading when all required model files exist")
+    args = parser.parse_args()
     root = Path(os.environ.get("LAYA_MODEL_DIR", "models"))
     root.mkdir(parents=True, exist_ok=True)
-    download_model(root)
+    download_model(root, if_missing=args.if_missing)
     print(f"Multilingual model is ready in {root / 'multilingual'}")
 
 

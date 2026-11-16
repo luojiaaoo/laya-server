@@ -15,13 +15,12 @@ RUN test "$(git -C /upstream rev-parse HEAD)" = "$LAYA_UPSTREAM_SHA" && \
     test -z "$(git -C /upstream status --porcelain)" || \
     (echo 'Laya checkout must match the pinned SHA and be clean' >&2; exit 1)
 
-FROM python:3.12-slim AS model-download
-ENV LAYA_MODEL_DIR=/opt/model-download MODELSCOPE_CACHE=/opt/modelscope-cache
+FROM python:3.12-slim AS model-downloader
+ENV LAYA_MODEL_DIR=/models MODELSCOPE_CACHE=/opt/modelscope-cache
 WORKDIR /app
 RUN pip install --no-cache-dir modelscope==1.34.0
 COPY scripts/download-models.py /app/scripts/download-models.py
-RUN python /app/scripts/download-models.py && \
-    test -s /opt/model-download/multilingual/model.safetensors
+CMD ["python", "/app/scripts/download-models.py", "--if-missing"]
 
 FROM python:3.12-slim AS app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
@@ -37,11 +36,9 @@ COPY --from=upstream-check /upstream/laya/ /opt/laya/laya/
 RUN pip install --no-cache-dir --no-deps /opt/laya
 COPY backend/ /app/backend/
 RUN pip install --no-cache-dir /app/backend
-COPY --from=model-download /opt/model-download/multilingual/ /opt/models/multilingual/
 COPY scripts/smoke-image-model.py /app/scripts/smoke-image-model.py
 COPY --from=frontend-build /app/frontend/dist/ /app/frontend/dist/
-# Docker builds need no GPU; exercise the same CUDA-enabled wheel on CPU here.
-RUN mkdir -p /data && LAYA_DEVICE=cpu python /app/scripts/smoke-image-model.py
+RUN mkdir -p /data /opt/models
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=3)" || exit 1
 CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--proxy-headers"]

@@ -15,29 +15,31 @@ LAYA SERVER is a self-hosted API and web interface for Laya's structured decisio
 
 ## Quick Start
 
-Once the image is published, install Docker and run the following command. Replace `latest` with a version tag to pin a release.
+Install Docker, copy `.env.example` to `.env`, and set the administrator password before starting:
 
 ```sh
-docker run -d --name laya-server --init --restart unless-stopped --gpus all \
-  -p 8080:8080 \
-  -v "$(pwd)/data:/data" \
-  -e LAYA_ADMIN_USERNAME=admin \
-  -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
-  -e LAYA_DEVICE=cuda \
-  1panel/laya-server:latest
+docker compose up -d
+docker compose logs -f model-init
 ```
 
 Replace the sample password with your own, then sign in at `http://YOUR_SERVER_IP:8080`. Create a key on the **API Keys** page; the full key is shown only once. `/health/ready` checks CUDA availability and the model files. Data is stored in the local `./data` directory, which is ignored by Git.
 
 ## GPU deployment
 
-Model files are downloaded from [ModelScope](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
+The application image contains no model files. A separate `model-downloader` build
+stage provides the download tool; Compose runs it to write the model directly into
+the host's `./models` directory through a bind mount. No model download happens
+during image builds. Model files come from [ModelScope](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
 with download integrity checked by the ModelScope SDK using repository metadata. Only the required weights, tokenizer and
-encoder configuration are included. Runtime inference stays offline.
+encoder configuration are downloaded. Runtime inference stays offline.
 To download locally: `pip install modelscope==1.34.0`, then run
 `python scripts/download-models.py`. The script only downloads `multilingual` to
 `./models/multilingual` by default. Override the directory with `LAYA_MODEL_DIR`.
-Compose mounts `./models` at `/opt/models`; download the model before starting Compose.
+Compose mounts `./models` at `/opt/models`. `docker compose up -d` first builds and
+runs the lightweight `model-init` service, which downloads missing model files from
+ModelScope before starting the app. Complete existing models are reused without
+network access. If downloading fails, the app will not start. View download progress
+with `docker compose logs -f model-init`. This download service does not need a GPU.
 The `models/` and `data/` directories are ignored by Git. Set `LAYA_PORT` in `.env`
 to change the host port (default: `8080`).
 
@@ -62,7 +64,7 @@ docker compose exec app python /app/scripts/smoke-image-model.py
 ```
 
 If `laya/` already exists, use that checkout at the pinned commit instead of cloning
-again. Builds run the bundled model check on CPU and do not need a GPU. The final
+again. Builds do not download models or need a GPU. The final
 command runs real offline inference on the configured GPU and checks model placement.
 For explicit CPU operation, set `LAYA_DEVICE=cpu` and omit `--gpus all`, or remove
 `deploy.resources.reservations.devices` from `compose.yaml`.
@@ -82,7 +84,7 @@ curl -X POST http://YOUR_SERVER_IP:8080/v1/systemone \
   -d '{"state":{"message":"I was charged twice"},"questions":{"refund":{"type":"noul","instructions":"Does the customer ask for a refund?"}}}'
 ```
 
-Successful responses include `answers`, `model`, and actual token counts in `usage`. The published image includes the multilingual model; `model=auto` (the default) and `model=multilingual` are available. See **Documentation** in the console for more request examples.
+Successful responses include `answers`, `model`, and actual token counts in `usage`. The service uses the multilingual model downloaded by `model-init`; `model=auto` (the default) and `model=multilingual` are available. See **Documentation** in the console for more request examples.
 
 ## Usage statistics and storage
 

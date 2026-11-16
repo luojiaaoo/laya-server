@@ -15,16 +15,11 @@ LAYA SERVER 是 Laya 结构化决策模型的自托管 API 与 Web 界面，兼�
 
 ## 快速开始
 
-镜像发布后，安装 Docker 并运行（如需固定版本，将 `latest` 换成对应标签）：
+安装 Docker，将 `.env.example` 复制为 `.env` 并填写管理员密码，然后启动：
 
 ```sh
-docker run -d --name laya-server --init --restart unless-stopped --gpus all \
-  -p 8080:8080 \
-  -v "$(pwd)/data:/data" \
-  -e LAYA_ADMIN_USERNAME=admin \
-  -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
-  -e LAYA_DEVICE=cuda \
-  1panel/laya-server:latest
+docker compose up -d
+docker compose logs -f model-init
 ```
 
 将示例密码换成自己的密码，访问 `http://YOUR_SERVER_IP:8080` 登录，在 **API Keys** 页面创建密钥；完整密钥只显示一次。`/health/ready` 可用于检查 CUDA 可用性和模型文件。数据保存在本地 `./data` 目录中，该目录已被 Git 忽略。
@@ -33,12 +28,17 @@ docker run -d --name laya-server --init --restart unless-stopped --gpus all \
 
 ## GPU 部署
 
-构建镜像时从[魔搭仓库](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
+应用镜像不包含模型文件。独立的 `model-downloader` 构建阶段只提供下载工具，
+Compose 运行它时通过目录挂载，将模型直接下载到宿主机的 `./models`，构建镜像时不下载模型。
+模型来自[魔搭仓库](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)，
 下载模型，由魔搭 SDK 根据仓库元数据校验下载完整性，仅包含所需权重、分词器和编码器配置，运行时仍使用本地文件离线推理。
 如需本地下载，先执行 `pip install modelscope==1.34.0`，
 再执行 `python scripts/download-models.py`。脚本仅下载 `multilingual`，默认保存在当前目录下的
 `./models/multilingual`，可通过 `LAYA_MODEL_DIR` 覆盖路径。
-Compose 会将 `./models` 挂载到 `/opt/models`，请在启动 Compose 前先下载模型。
+Compose 会将 `./models` 挂载到 `/opt/models`。执行 `docker compose up -d` 时，
+会先构建并运行轻量的 `model-init` 服务，从魔搭下载缺失的模型文件，成功后才启动应用。
+已有完整模型时直接复用，不访问网络；下载失败时不会启动应用。
+使用 `docker compose logs -f model-init` 查看下载进度。下载服务不需要 GPU。
 `models/` 和 `data/` 目录已加入 Git 忽略规则。在 `.env` 中设置 `LAYA_PORT` 可修改宿主机端口，默认 `8080`。
 
 镜像安装 PyTorch 2.5.1 的 CUDA 12.4 版本，默认使用 `LAYA_DEVICE=cuda`。
@@ -59,7 +59,7 @@ LAYA_IMAGE_TAG=gpu-local docker compose up -d
 docker compose exec app python /app/scripts/smoke-image-model.py
 ```
 
-若已有 `laya/`，直接使用固定提交的现有检出目录，无需再次克隆。构建阶段在 CPU 上检查模型，
+若已有 `laya/`，直接使用固定提交的现有检出目录，无需再次克隆。构建阶段不下载模型，
 无需 GPU；最后一条命令会在配置的 GPU 上执行真实离线推理，并检查模型参数所在设备。
 如需显式使用 CPU，设置 `LAYA_DEVICE=cpu` 并省略 `--gpus all`；使用 Compose 时，
 还需移除 `compose.yaml` 中的 `deploy.resources.reservations.devices` 配置。
@@ -77,7 +77,7 @@ curl -X POST http://YOUR_SERVER_IP:8080/v1/systemone \
   -d '{"state":{"message":"I was charged twice"},"questions":{"refund":{"type":"noul","instructions":"Does the customer ask for a refund?"}}}'
 ```
 
-成功响应包含 `answers`、`model` 和实际的 `usage` token 计数。发布镜像内置 multilingual 模型；`model=auto`（默认）和 `model=multilingual` 均可使用。更多请求格式见控制台 **Documentation** 页面。
+成功响应包含 `answers`、`model` 和实际的 `usage` token 计数。服务使用 `model-init` 下载的 multilingual 模型；`model=auto`（默认）和 `model=multilingual` 均可使用。更多请求格式见控制台 **Documentation** 页面。
 
 ## 许可与反馈
 
