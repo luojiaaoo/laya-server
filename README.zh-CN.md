@@ -18,17 +18,48 @@ LAYA SERVER 是 Laya 结构化决策模型的自托管 API 与 Web 界面，兼�
 镜像发布后，安装 Docker 并运行（如需固定版本，将 `latest` 换成对应标签）：
 
 ```sh
-docker run -d --name laya-server --init --restart unless-stopped \
+docker run -d --name laya-server --init --restart unless-stopped --gpus all \
   -p 8080:8080 \
   -v laya-data:/data \
   -e LAYA_ADMIN_USERNAME=admin \
   -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
+  -e LAYA_DEVICE=cuda \
   1panel/laya-server:latest
 ```
 
-将示例密码换成自己的密码，访问 `http://YOUR_SERVER_IP:8080` 登录，在 **API Keys** 页面创建密钥；完整密钥只显示一次。`/health/ready` 可用于检查模型文件。数据保存在 `laya-data` 卷中。
+将示例密码换成自己的密码，访问 `http://YOUR_SERVER_IP:8080` 登录，在 **API Keys** 页面创建密钥；完整密钥只显示一次。`/health/ready` 可用于检查 CUDA 可用性和模型文件。数据保存在 `laya-data` 卷中。
 
 `YOUR_SERVER_IP` 是服务器 IP。若通过域名访问，可在反向代理上配置 HTTPS 并转发到服务器的 8080 端口。
+
+## GPU 部署
+
+构建镜像时从[魔搭仓库](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
+下载模型，由魔搭 SDK 根据仓库元数据校验下载完整性，仅包含所需权重、分词器和编码器配置，运行时仍使用本地文件离线推理。
+如需本地下载，先执行 `pip install modelscope==1.34.0`，设置 `LAYA_MODEL_DIR=models`，
+再执行 `python scripts/download-models.py`。脚本仅下载 `multilingual`。
+
+镜像安装 PyTorch 2.5.1 的 CUDA 12.4 版本，默认使用 `LAYA_DEVICE=cuda`。
+宿主机需要兼容的 NVIDIA 显卡和驱动，并安装
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
+容器 GPU 透传使用 [Docker Compose 官方配置](https://docs.docker.com/compose/how-tos/gpu-support/)。
+CUDA 不可用时服务会在启动阶段报错。设置 `LAYA_DEVICE=cuda:1` 可选择容器内可见的第二张显卡；
+单进程使用一张显卡。上游 Laya 在 GPU 内存错误时仍会尝试 CPU 重试，请根据显存调整输入长度和并发量。
+
+在 GPU 镜像发布前，可从当前代码构建并启动：
+
+```sh
+git clone --depth 1 --branch v0.4.2 https://github.com/NandhaKishorM/laya.git laya
+git -C laya checkout --detach 68804629e8ccd9d616d48a40e87de9fabbeae069
+docker build -t 1panel/laya-server:gpu-local .
+# 先将 .env.example 复制为 .env，并填写管理员密码。
+LAYA_IMAGE_TAG=gpu-local docker compose up -d
+docker compose exec app python /app/scripts/smoke-image-model.py
+```
+
+若已有 `laya/`，直接使用固定提交的现有检出目录，无需再次克隆。构建阶段在 CPU 上检查模型，
+无需 GPU；最后一条命令会在配置的 GPU 上执行真实离线推理，并检查模型参数所在设备。
+如需显式使用 CPU，设置 `LAYA_DEVICE=cpu` 并省略 `--gpus all`；使用 Compose 时，
+还需移除 `compose.yaml` 中的 `deploy.resources.reservations.devices` 配置。
 
 ## 界面截图
 

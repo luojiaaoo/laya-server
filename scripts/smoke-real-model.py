@@ -18,7 +18,7 @@ with TemporaryDirectory() as temporary:
     os.environ["LAYA_DATABASE_PATH"] = str(Path(temporary) / "smoke.sqlite3")
     os.environ["LAYA_MODEL_DIR"] = os.environ.get("LAYA_MODEL_DIR", "models")
     os.environ.setdefault("HF_HOME", str(Path(os.environ["LAYA_MODEL_DIR"]) / ".cache"))
-    os.environ["LAYA_DEVICE"] = "cpu"
+    os.environ.setdefault("LAYA_DEVICE", "cuda")
     os.environ["LAYA_FRONTEND_DIR"] = str(Path(temporary) / "no-frontend")
     from server.main import app
 

@@ -41,6 +41,33 @@ PAYLOAD = {
 }
 
 
+def test_cuda_unavailable_prevents_startup(tmp_path, monkeypatch, client_factory):
+    def unavailable(device):
+        raise RuntimeError("CUDA is unavailable")
+
+    monkeypatch.setattr("server.main.validate_device", unavailable)
+    settings = Settings("admin", "unused", tmp_path / "db.sqlite3", 1,
+                        tmp_path / "models", "cuda", 1, tmp_path / "missing-dist")
+    with pytest.raises(RuntimeError, match="CUDA is unavailable"):
+        client_factory(create_app(settings))
+
+
+def test_readiness_checks_cuda_after_startup(tmp_path, monkeypatch, client_factory):
+    monkeypatch.setattr("server.main.validate_device", lambda device: device)
+    settings = Settings("admin", "unused", tmp_path / "db.sqlite3", 1,
+                        tmp_path / "models", "cuda", 1, tmp_path / "missing-dist")
+    client = client_factory(create_app(settings))
+
+    def unavailable(device):
+        raise RuntimeError("CUDA is unavailable")
+
+    monkeypatch.setattr("server.main.validate_device", unavailable)
+    assert client.get("/health/live").status_code == 200
+    response = client.get("/health/ready")
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "DEVICE_UNAVAILABLE"
+
+
 def test_multilingual_image_routes_auto_and_rejects_unbundled_models(tmp_path, client_factory):
     model = tmp_path / "models" / "multilingual"
     for filename in ("rl_agent_config.json", "model.safetensors", "tokenizer/tokenizer.json", "encoder/config.json"):

@@ -23,6 +23,7 @@ def test_adapter_uses_pinned_router_public_interface(monkeypatch, tmp_path: Path
     result = adapter.predict("text", {"q": {"type": "noul", "instructions": "yes?"}}, model="english")
     assert calls[0][1]["models"] == {name: str(tmp_path / name) for name in ("english", "multilingual", "typed-decisions")}
     assert calls[0][1]["max_loaded"] == 2
+    assert calls[0][1]["device"] == "cpu"
     assert calls[1] == ("predict", "text", {"q": {"type": "noul", "instructions": "yes?"}}, "english")
     assert result["usage"]["input_tokens"] == 1
 
@@ -49,3 +50,16 @@ def test_adapter_max_len_overrides_are_isolated(monkeypatch, tmp_path: Path):
     assert calls == [("multilingual", {"max_len": 2048}), ("multilingual", {"max_len": 8192}), ("multilingual", {})]
     assert len(routers) == 1
     assert routers[0].cfg == {"max_len": 1024}
+
+
+def test_adapter_passes_selected_gpu_to_router(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=SimpleNamespace(
+        is_available=lambda: True, device_count=lambda: 2, current_device=lambda: 0,
+    )))
+    calls = []
+    monkeypatch.setitem(sys.modules, "laya", SimpleNamespace(Router=lambda **kwargs: calls.append(kwargs)))
+    adapter = LayaAdapter(tmp_path, "cuda:1", 1)
+    assert adapter.device == "cuda:1"
+    assert calls[0]["device"] == "cuda:1"

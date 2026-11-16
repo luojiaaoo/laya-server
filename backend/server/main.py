@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 
 from .config import Settings
 from .database import Database, utc_now
+from .device import validate_device
 from .laya_adapter import LayaAdapter, Predictor
 from .schemas import CreateKeyRequest, InferenceRequest, LoginRequest
 from .usage_writer import UsageEvent, UsageWriter
@@ -42,6 +43,8 @@ def create_app(settings: Settings | None = None, predictor: Predictor | None = N
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if predictor is None:
+            validate_device(settings.device)
         usage_writer.start()
         try:
             yield
@@ -154,6 +157,11 @@ def create_app(settings: Settings | None = None, predictor: Predictor | None = N
 
     @app.get("/health/ready")
     def ready() -> dict[str, str]:
+        if predictor is None:
+            try:
+                validate_device(settings.device)
+            except (RuntimeError, ValueError, ImportError) as exc:
+                raise error(503, "DEVICE_UNAVAILABLE", str(exc)) from exc
         names = ("multilingual",) if settings.model_profile == "multilingual" else ("english", "multilingual", "typed-decisions")
         for name in names:
             directory = settings.model_dir / name

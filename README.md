@@ -18,15 +18,50 @@ LAYA SERVER is a self-hosted API and web interface for Laya's structured decisio
 Once the image is published, install Docker and run the following command. Replace `latest` with a version tag to pin a release.
 
 ```sh
-docker run -d --name laya-server --init --restart unless-stopped \
+docker run -d --name laya-server --init --restart unless-stopped --gpus all \
   -p 8080:8080 \
   -v laya-data:/data \
   -e LAYA_ADMIN_USERNAME=admin \
   -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
+  -e LAYA_DEVICE=cuda \
   1panel/laya-server:latest
 ```
 
-Replace the sample password with your own, then sign in at `http://YOUR_SERVER_IP:8080`. Create a key on the **API Keys** page; the full key is shown only once. `/health/ready` checks the model files. Data is stored in the `laya-data` volume.
+Replace the sample password with your own, then sign in at `http://YOUR_SERVER_IP:8080`. Create a key on the **API Keys** page; the full key is shown only once. `/health/ready` checks CUDA availability and the model files. Data is stored in the `laya-data` volume.
+
+## GPU deployment
+
+Model files are downloaded from [ModelScope](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
+with download integrity checked by the ModelScope SDK using repository metadata. Only the required weights, tokenizer and
+encoder configuration are included. Runtime inference stays offline.
+To download locally: `pip install modelscope==1.34.0`, then set `LAYA_MODEL_DIR=models`
+and run `python scripts/download-models.py`. The script only downloads `multilingual`.
+
+The image installs PyTorch 2.5.1 with CUDA 12.4 and defaults to `LAYA_DEVICE=cuda`.
+The host needs a compatible NVIDIA GPU and driver, plus the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+GPU access follows the [Docker Compose GPU configuration](https://docs.docker.com/compose/how-tos/gpu-support/).
+Startup fails with a diagnostic if CUDA is unavailable. Set `LAYA_DEVICE=cuda:1` to
+select the second GPU visible inside the container; a single process uses one GPU.
+Upstream Laya retains its CPU retry behavior for GPU memory errors, so size request
+lengths and concurrency to fit your GPU memory.
+
+To build this checkout locally before a GPU image is published:
+
+```sh
+git clone --depth 1 --branch v0.4.2 https://github.com/NandhaKishorM/laya.git laya
+git -C laya checkout --detach 68804629e8ccd9d616d48a40e87de9fabbeae069
+docker build -t 1panel/laya-server:gpu-local .
+# Copy .env.example to .env and fill in the admin password first.
+LAYA_IMAGE_TAG=gpu-local docker compose up -d
+docker compose exec app python /app/scripts/smoke-image-model.py
+```
+
+If `laya/` already exists, use that checkout at the pinned commit instead of cloning
+again. Builds run the bundled model check on CPU and do not need a GPU. The final
+command runs real offline inference on the configured GPU and checks model placement.
+For explicit CPU operation, set `LAYA_DEVICE=cpu` and omit `--gpus all`, or remove
+`deploy.resources.reservations.devices` from `compose.yaml`.
 
 `YOUR_SERVER_IP` is your server's IP address. To use a domain name, configure HTTPS on a reverse proxy and forward requests to port 8080 on the server.
 

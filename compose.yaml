@@ -4,6 +4,14 @@ services:
     environment:
       - LAYA_ADMIN_USERNAME
       - LAYA_ADMIN_PASSWORD
+      - LAYA_DEVICE=${LAYA_DEVICE:-cuda}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

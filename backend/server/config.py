@@ -38,7 +38,7 @@ class Settings:
             Path(os.environ.get("LAYA_DATABASE_PATH", "/data/laya.sqlite3")),
             int(os.environ.get("LAYA_SESSION_HOURS", "12")),
             Path(os.environ.get("LAYA_MODEL_DIR", "/models")),
-            os.environ.get("LAYA_DEVICE") or None,
+            os.environ.get("LAYA_DEVICE") or "cuda",
             int(os.environ.get("LAYA_MAX_LOADED_MODELS", "1")),
             Path(os.environ.get("LAYA_FRONTEND_DIR", "/app/frontend/dist")),
             model_profile,
