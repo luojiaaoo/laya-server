@@ -18,7 +18,7 @@ RUN test "$(git -C /upstream rev-parse HEAD)" = "$LAYA_UPSTREAM_SHA" && \
 FROM python:3.12-slim AS model-downloader
 ENV LAYA_MODEL_DIR=/models MODELSCOPE_CACHE=/opt/modelscope-cache
 WORKDIR /app
-RUN pip install --no-cache-dir modelscope==1.34.0
+RUN pip install --no-cache-dir modelscope==1.34.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
 COPY scripts/download-models.py /app/scripts/download-models.py
 CMD ["python", "/app/scripts/download-models.py", "--if-missing"]
 
