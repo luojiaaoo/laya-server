@@ -24,15 +24,16 @@ def test_default_command_downloads_only_multilingual(downloader, monkeypatch, tm
             path.write_text("model-file", encoding="utf-8")
 
     monkeypatch.setitem(sys.modules, "modelscope", SimpleNamespace(snapshot_download=snapshot_download))
-    monkeypatch.setenv("LAYA_MODEL_DIR", str(tmp_path))
+    monkeypatch.delenv("LAYA_MODEL_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["download-models.py"])
     downloader["main"]()
     assert len(calls) == 1
     assert calls[0]["model_id"] == "convaiinnovations/laya-multilingual"
     assert calls[0]["revision"] == "master"
-    assert (tmp_path / "multilingual" / "model.safetensors").is_file()
-    assert (tmp_path / "multilingual" / "encoder" / "config.json").is_file()
-    assert {path.name for path in tmp_path.iterdir()} == {"multilingual"}
+    assert (tmp_path / "models" / "multilingual" / "model.safetensors").is_file()
+    assert (tmp_path / "models" / "multilingual" / "encoder" / "config.json").is_file()
+    assert {path.name for path in (tmp_path / "models").iterdir()} == {"multilingual"}
 
 
 def test_incomplete_snapshot_fails(downloader, monkeypatch, tmp_path):

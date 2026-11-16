@@ -44,7 +44,7 @@ def download_model(root: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
-    root = Path(os.environ.get("LAYA_MODEL_DIR", "/models"))
+    root = Path(os.environ.get("LAYA_MODEL_DIR", "models"))
     root.mkdir(parents=True, exist_ok=True)
     download_model(root)
     print(f"Multilingual model is ready in {root / 'multilingual'}")

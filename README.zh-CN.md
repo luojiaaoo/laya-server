@@ -20,14 +20,14 @@ LAYA SERVER 是 Laya 结构化决策模型的自托管 API 与 Web 界面，兼�
 ```sh
 docker run -d --name laya-server --init --restart unless-stopped --gpus all \
   -p 8080:8080 \
-  -v laya-data:/data \
+  -v "$(pwd)/data:/data" \
   -e LAYA_ADMIN_USERNAME=admin \
   -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
   -e LAYA_DEVICE=cuda \
   1panel/laya-server:latest
 ```
 
-将示例密码换成自己的密码，访问 `http://YOUR_SERVER_IP:8080` 登录，在 **API Keys** 页面创建密钥；完整密钥只显示一次。`/health/ready` 可用于检查 CUDA 可用性和模型文件。数据保存在 `laya-data` 卷中。
+将示例密码换成自己的密码，访问 `http://YOUR_SERVER_IP:8080` 登录，在 **API Keys** 页面创建密钥；完整密钥只显示一次。`/health/ready` 可用于检查 CUDA 可用性和模型文件。数据保存在本地 `./data` 目录中，该目录已被 Git 忽略。
 
 `YOUR_SERVER_IP` 是服务器 IP。若通过域名访问，可在反向代理上配置 HTTPS 并转发到服务器的 8080 端口。
 
@@ -35,8 +35,11 @@ docker run -d --name laya-server --init --restart unless-stopped --gpus all \
 
 构建镜像时从[魔搭仓库](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
 下载模型，由魔搭 SDK 根据仓库元数据校验下载完整性，仅包含所需权重、分词器和编码器配置，运行时仍使用本地文件离线推理。
-如需本地下载，先执行 `pip install modelscope==1.34.0`，设置 `LAYA_MODEL_DIR=models`，
-再执行 `python scripts/download-models.py`。脚本仅下载 `multilingual`。
+如需本地下载，先执行 `pip install modelscope==1.34.0`，
+再执行 `python scripts/download-models.py`。脚本仅下载 `multilingual`，默认保存在当前目录下的
+`./models/multilingual`，可通过 `LAYA_MODEL_DIR` 覆盖路径。
+Compose 会将 `./models` 挂载到 `/opt/models`，请在启动 Compose 前先下载模型。
+`models/` 和 `data/` 目录已加入 Git 忽略规则。在 `.env` 中设置 `LAYA_PORT` 可修改宿主机端口，默认 `8080`。
 
 镜像安装 PyTorch 2.5.1 的 CUDA 12.4 版本，默认使用 `LAYA_DEVICE=cuda`。
 宿主机需要兼容的 NVIDIA 显卡和驱动，并安装

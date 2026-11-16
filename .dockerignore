@@ -24,6 +24,7 @@
 /frontend/*.tsbuildinfo
 /data
 /models
+/model
 **/__pycache__
 **/*.pyc
 **/*.sqlite3

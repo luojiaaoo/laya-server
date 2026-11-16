@@ -20,22 +20,26 @@ Once the image is published, install Docker and run the following command. Repla
 ```sh
 docker run -d --name laya-server --init --restart unless-stopped --gpus all \
   -p 8080:8080 \
-  -v laya-data:/data \
+  -v "$(pwd)/data:/data" \
   -e LAYA_ADMIN_USERNAME=admin \
   -e LAYA_ADMIN_PASSWORD='change-this-admin-password' \
   -e LAYA_DEVICE=cuda \
   1panel/laya-server:latest
 ```
 
-Replace the sample password with your own, then sign in at `http://YOUR_SERVER_IP:8080`. Create a key on the **API Keys** page; the full key is shown only once. `/health/ready` checks CUDA availability and the model files. Data is stored in the `laya-data` volume.
+Replace the sample password with your own, then sign in at `http://YOUR_SERVER_IP:8080`. Create a key on the **API Keys** page; the full key is shown only once. `/health/ready` checks CUDA availability and the model files. Data is stored in the local `./data` directory, which is ignored by Git.
 
 ## GPU deployment
 
 Model files are downloaded from [ModelScope](https://www.modelscope.cn/models/convaiinnovations/laya-multilingual)
 with download integrity checked by the ModelScope SDK using repository metadata. Only the required weights, tokenizer and
 encoder configuration are included. Runtime inference stays offline.
-To download locally: `pip install modelscope==1.34.0`, then set `LAYA_MODEL_DIR=models`
-and run `python scripts/download-models.py`. The script only downloads `multilingual`.
+To download locally: `pip install modelscope==1.34.0`, then run
+`python scripts/download-models.py`. The script only downloads `multilingual` to
+`./models/multilingual` by default. Override the directory with `LAYA_MODEL_DIR`.
+Compose mounts `./models` at `/opt/models`; download the model before starting Compose.
+The `models/` and `data/` directories are ignored by Git. Set `LAYA_PORT` in `.env`
+to change the host port (default: `8080`).
 
 The image installs PyTorch 2.5.1 with CUDA 12.4 and defaults to `LAYA_DEVICE=cuda`.
 The host needs a compatible NVIDIA GPU and driver, plus the
